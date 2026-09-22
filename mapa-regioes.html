@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avança | Bairros de Atendimento</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+
+<style>
+  :root{
+    --page:      #0d0d0d;
+    --surface:   #171716;
+    --surface-2: #1f1f1e;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --ink-muted: #8b8a83;
+    --grid:      #2c2c2a;
+    --border:    rgba(255,255,255,0.10);
+    --accent:    #3987e5;
+
+    --r1:#3987e5; --r2:#d95926; --r3:#199e70; --r4:#c98500; --r5:#d55181; --r6:#008300;
+    /* slots livres pra novas regiões, no mesmo esquema categórico: --r7:#9085e9 (violeta) --r8:#e66767 (vermelho) */
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    background:var(--page);
+    color:var(--ink);
+    font-family:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    display:flex; flex-direction:column;
+  }
+
+  header{
+    padding:20px 24px 16px;
+    flex:0 0 auto;
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+    border-bottom:1px solid var(--border);
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{
+    width:30px; height:30px; border-radius:8px;
+    background:linear-gradient(135deg, var(--r1), var(--r3));
+    flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    font-family:"Archivo", sans-serif; font-weight:800; font-size:14px; color:#fff;
+  }
+  h1{
+    font-family:"Archivo", system-ui, sans-serif;
+    font-weight:800;
+    font-size:clamp(19px,2.4vw,25px);
+    letter-spacing:-0.01em;
+    margin:0;
+  }
+  .header-text{ display:flex; flex-direction:column; gap:3px; }
+  .subtitle{ color:var(--ink-2); font-size:13.5px; margin:0; max-width:70ch; }
+  .meta{
+    color:var(--ink-muted);
+    font-family:"IBM Plex Mono", ui-monospace, monospace;
+    font-size:11px;
+    letter-spacing:0.02em;
+    text-transform:uppercase;
+    white-space:nowrap;
+    align-self:center;
+  }
+
+  .search{ position:relative; margin-left:auto; width:min(280px, 46vw); }
+  @media (max-width:840px){ .search{ margin-left:0; width:100%; } }
+  .search input{
+    width:100%; background:var(--surface-2); color:var(--ink);
+    border:1px solid var(--border); border-radius:9px;
+    padding:8px 12px 8px 32px;
+    font-family:"IBM Plex Sans", sans-serif; font-size:13px;
+    outline:none;
+  }
+  .search input:focus{ border-color:var(--accent); }
+  .search input::placeholder{ color:var(--ink-muted); }
+  .search svg{
+    position:absolute; left:10px; top:50%; transform:translateY(-50%);
+    width:14px; height:14px; stroke:var(--ink-muted); pointer-events:none;
+  }
+  .search-results{
+    position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:1000;
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);
+    max-height:280px; overflow-y:auto;
+  }
+  .search-results:empty{ display:none; }
+  .search-result{
+    display:flex; align-items:center; gap:8px;
+    padding:8px 10px; cursor:pointer; font-size:13px;
+  }
+  .search-result:hover, .search-result.active{ background:var(--surface-2); }
+  .search-result .swatch{ box-shadow:none; }
+  .search-result .r-name{ flex:1; }
+  .search-result .r-region{ font-size:10.5px; color:var(--ink-muted); }
+
+  .layout{ flex:1 1 auto; min-height:0; display:flex; gap:14px; padding:14px; }
+  @media (max-width:840px){ .layout{ flex-direction:column; } .meta{ margin-left:0; } }
+
+  #map{
+    flex:1 1 auto; min-width:0; min-height:360px;
+    border-radius:14px; border:1px solid var(--border);
+    background:var(--surface-2);
+  }
+
+  .sidebar{
+    flex:0 0 300px; overflow-y:auto;
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:14px;
+  }
+  @media (max-width:840px){ .sidebar{ flex:0 0 auto; max-height:40vh; } }
+
+  .sidebar h2{
+    font-family:"Archivo", sans-serif; font-size:12.5px; font-weight:700;
+    text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-muted); margin:0 0 10px;
+  }
+
+  .region-row{ border:0; border-radius:10px; padding:8px; }
+  .region-row + .region-row{ margin-top:2px; }
+  .region-row:hover{ background:var(--surface-2); }
+  .region-row.dimmed .row-top{ opacity:0.4; }
+  .row-top{ display:flex; align-items:center; gap:8px; cursor:pointer; }
+  .row-top input[type=checkbox]{ accent-color: var(--dot); width:14px; height:14px; flex:0 0 auto; }
+  .swatch{ width:10px; height:10px; border-radius:50%; background:var(--dot); flex:0 0 auto; box-shadow:0 0 0 3px color-mix(in srgb, var(--dot) 25%, transparent); }
+  .region-name{ font-weight:600; font-size:13.5px; flex:1; }
+  .region-count{ font-family:"IBM Plex Mono", monospace; font-size:10.5px; color:var(--ink-muted); }
+  .focus-btn{
+    border:1px solid var(--border); background:var(--surface-2); color:var(--ink-2);
+    font-size:10.5px; font-family:"IBM Plex Mono", monospace; border-radius:6px;
+    padding:2px 7px; cursor:pointer;
+  }
+  .focus-btn:hover{ color:var(--ink); border-color:var(--dot); }
+  .bairro-chips{ margin:7px 0 2px 22px; display:flex; flex-wrap:wrap; gap:4px; }
+  .chip{
+    font-size:11px; color:var(--ink-2); background:var(--surface-2);
+    border:1px solid var(--border); border-radius:999px; padding:2px 7px;
+  }
+
+  .footnote{
+    margin:0 14px 14px; padding:12px 15px; font-size:12.5px; line-height:1.55; color:var(--ink-2);
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  }
+  .footnote strong{ color:var(--ink); }
+  .footnote code{
+    font-family:"IBM Plex Mono", monospace; font-size:11.5px;
+    background:var(--surface-2); border:1px solid var(--border); border-radius:4px; padding:1px 5px;
+  }
+
+  .bairro-pin-wrap{ background:none; border:none; }
+  .bairro-pin{ position:relative; width:100%; height:100%; }
+  .bairro-pin::before{
+    content:""; position:absolute; inset:0;
+    background:var(--c);
+    border:2px solid #0d0d0d;
+    border-radius:50% 50% 50% 0;
+    transform:rotate(-45deg);
+    box-shadow:0 2px 6px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.15);
+  }
+  .bairro-pin::after{
+    content:""; position:absolute; left:50%; top:42%;
+    width:6px; height:6px; margin:-3px 0 0 -3px;
+    background:#fff; border-radius:50%;
+  }
+  .bairro-pin.pin-hit::before{ animation: pinPulse 1s ease-out 2; }
+  @keyframes pinPulse{
+    0%   { box-shadow:0 2px 6px rgba(0,0,0,.6), 0 0 0 0 var(--c); }
+    70%  { box-shadow:0 2px 6px rgba(0,0,0,.6), 0 0 0 14px transparent; }
+    100% { box-shadow:0 2px 6px rgba(0,0,0,.6), 0 0 0 0 transparent; }
+  }
+
+  .leaflet-tooltip.bairro-label{
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--ink);
+    font-family:"IBM Plex Sans", sans-serif;
+    font-weight:600;
+    font-size:11.5px;
+    padding:3px 8px 3px 6px;
+    border-radius:7px;
+    box-shadow:0 2px 8px rgba(0,0,0,.5);
+    white-space:nowrap;
+  }
+  .leaflet-tooltip.bairro-label::before{ display:none; }
+  .bairro-label .tag-dot{
+    display:inline-block; width:7px; height:7px; border-radius:50%;
+    margin-right:5px; vertical-align:middle;
+  }
+
+  .leaflet-control-attribution{
+    background:rgba(23,23,22,0.85) !important;
+    color:var(--ink-muted) !important;
+  }
+  .leaflet-control-attribution a{ color:var(--ink-2) !important; }
+  .leaflet-control-zoom a{
+    background:var(--surface) !important; color:var(--ink) !important; border-color:var(--border) !important;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">C</div>
+    <div class="header-text">
+      <h1>Bairros de Atendimento</h1>
+      <p class="subtitle">Avança | Par — bairros de atendimento, coloridos por região operacional.</p>
+    </div>
+  </div>
+  <div class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    <input type="text" id="searchInput" placeholder="Buscar bairro..." autocomplete="off">
+    <div class="search-results" id="searchResults"></div>
+  </div>
+  <span class="meta" id="metaCount">— bairros</span>
+</header>
+
+<div class="layout">
+  <div id="map"></div>
+  <aside class="sidebar">
+    <h2>Regiões</h2>
+    <div id="legend"></div>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  const REGIONS = [
+    { id:1, name:"Centro" },
+    { id:2, name:"Conselheiro Paulino" },
+    { id:3, name:"Riograndina / Amparo" },
+    { id:4, name:"Mury / Cascatinha" },
+    { id:5, name:"Campo do Coelho / Conquista" },
+    { id:6, name:"Salinas / Três Picos" },
+  ];
+
+  // [nome, regiaoId, lat, lon] — coordenadas extraídas do KML exportado do Google My Maps
+  const BAIRROS = [
+    ["Centro",1,-22.29570624084781,-42.53202418278514],
+    ["Ypu",1,-22.29933730920721,-42.52194453353806],
+    ["Vila Guarani",1,-22.29314116727179,-42.52804315190412],
+    ["Bela Vista",1,-22.29433071641427,-42.53757046785781],
+    ["Perisse",1,-22.28951294330228,-42.53488659488048],
+    ["Vila Amélia",1,-22.29067039779694,-42.54179067720943],
+    ["Lagoinha",1,-22.28566040271786,-42.54182192065299],
+    ["Aprazível",1,-22.28885233683663,-42.54578575647492],
+    ["Granja Spinelli",1,-22.29259011053141,-42.55320473745111],
+    ["Varginha",1,-22.29325511439981,-42.49968987350447],
+    ["Catarcione",1,-22.2919141617193,-42.518690367408],
+    ["Cordoeira",1,-22.29028115610243,-42.52799887397283],
+    ["Fazenda Bela Vista",1,-22.29350015374687,-42.48955496185902],
+    ["Jardilândia",1,-22.27894382757126,-42.50185745956765],
+    ["Nova Suíça",1,-22.27331339497403,-42.50194031047476],
+    ["Braunes",1,-22.27813272010357,-42.52466865424056],
+
+    ["Chácara Paraíso",2,-22.26281577308655,-42.52166347420381],
+    ["Loteamento Jacina",2,-22.25995878148235,-42.52252329767368],
+    ["Vila Nova",2,-22.26494317592903,-42.53571290316438],
+    ["Loteamento São João",2,-22.26062869492584,-42.53241026501777],
+    ["Duas Pedras",2,-22.25719786422067,-42.53218112199705],
+    ["Corrego Dantas",2,-22.25464255659516,-42.54889509203167],
+    ["Sangrilad",2,-22.25587207896436,-42.53025535092091],
+    ["Conselheiro",2,-22.22646992334829,-42.52857382711305],
+    ["California",2,-22.23306659081581,-42.52997835898646],
+    ["Floresta",2,-22.23834559008563,-42.52699727118959],
+    ["Girassol",2,-22.23745001473166,-42.53308830130347],
+    ["Marajoi",2,-22.22934124933629,-42.52467876931878],
+    ["Santo André",2,-22.23017902462734,-42.51749366085973],
+    ["São Geraldo",2,-22.24040307103716,-42.55001587758865],
+    ["Solares",2,-22.24681762422161,-42.55110607684009],
+    ["Santa Bernadete",2,-22.24365185463466,-42.53829224595578],
+    ["Prado",2,-22.2441044069092,-42.51965126888915],
+    ["Ouro Preto",2,-22.24853776112682,-42.52669745419143],
+    ["Jardilândia",2,-22.24959056647798,-42.52619728244538],
+
+    ["Toledo",3,-22.24713410122638,-42.45759745461051],
+    ["Amparo",3,-22.25434860723471,-42.4592876460879],
+    ["Jardim do Éden",3,-22.25023830757542,-42.46385428703743],
+    ["Alto do Shuenk",3,-22.24195745578181,-42.43772510778214],
+    ["Rio Grandina",3,-22.19791148389023,-42.51125546150719],
+    ["Maria Tereza",3,-22.21199189264492,-42.51406284571862],
+    ["Rio Grande de Cima",3,-22.21942267963206,-42.57175816163281],
+    ["Fazenda Lage",3,-22.20805231705203,-42.53044673312721],
+    ["Lagoa Seca",3,-22.21890712698634,-42.51826966065322],
+    ["Alto do Catete",3,-22.225924222633644,-42.48215943227537],
+
+    ["Olaria",4,-22.31758029989555,-42.54338970835039],
+    ["Cônego",4,-22.31927122961199,-42.54709563370961],
+    ["Vargem Grande",4,-22.3211654301616,-42.55525287149791],
+    ["Cascatinha",4,-22.34147235412441,-42.55678573616883],
+    ["Ponte da Saudade",4,-22.3220364967235,-42.51527419219821],
+    ["Stucky",4,-22.33011307711568,-42.48030967565221],
+    ["Debossan",4,-22.35266709088721,-42.51794462141799],
+    ["Mury",4,-22.3308709505088,-42.49793119662358],
+
+    ["Barração dos Mendes",5,-22.28213044212284,-42.68245537585491],
+    ["Parque dos Pinheiros",5,-22.27507798910639,-42.60269412773109],
+    ["Campo do Coelho",5,-22.26792344434815,-42.61653136785642],
+    ["Parque Suíço",5,-22.25905976029932,-42.61473312282189],
+    ["Conquista",5,-22.26003328986605,-42.66743151787084],
+    ["Florândia",5,-22.2686470294288,-42.66474890393035],
+    ["Rio Grande",5,-22.30413529281714,-42.65992187337107],
+
+    ["Salinas",6,-22.31542168508109,-42.6403796500208],
+    ["Três Picos",6,-22.33179292774161,-42.68678513512541],
+    ["Fazenda Campestre",6,-22.33843826409043,-42.67084242488144],
+    ["Centenário",6,-22.32339937469826,-42.66282922957012],
+    ["Santa Cruz",6,-22.31708185865013,-42.66954309394587],
+    ["João Grande",6,-22.32509074029484,-42.69336175878853],
+  ];
+
+  // cor de cada região — mesma ordem categórica usada no resto do COP-Analytics
+  const HEX = { 1:"#3987e5", 2:"#d95926", 3:"#199e70", 4:"#c98500", 5:"#d55181", 6:"#008300" };
+
+  document.getElementById('metaCount').textContent = `${BAIRROS.length} bairros`;
+
+  const map = L.map('map', { scrollWheelZoom:true });
+
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 16,
+    attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, FAO, NOAA, USGS'
+  }).addTo(map);
+
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 16,
+    pane: 'shadowPane'
+  }).addTo(map);
+
+  function bairroIcon(color){
+    return L.divIcon({
+      className: 'bairro-pin-wrap',
+      html: `<div class="bairro-pin" style="--c:${color}"></div>`,
+      iconSize: [20,20],
+      iconAnchor: [10,20],
+    });
+  }
+
+  const regionLayers = {};
+  const allBounds = [];
+  const searchIndex = []; // { name, regionId, regionName, lat, lon, marker }
+
+  REGIONS.forEach(region=>{
+    const items = BAIRROS.filter(b=>b[1]===region.id);
+    const latlngs = items.map(b=>[b[2],b[3]]);
+    const color = HEX[region.id];
+    const group = L.layerGroup();
+
+    items.forEach(([name, , lat, lon])=>{
+      const marker = L.marker([lat, lon], { icon: bairroIcon(color) })
+        .bindTooltip(
+          `<span class="tag-dot" style="background:${color}"></span>${name}`,
+          { permanent:true, direction:"right", offset:[6,-8], className:"bairro-label" }
+        )
+        .addTo(group);
+      allBounds.push([lat, lon]);
+      searchIndex.push({ name, regionId: region.id, regionName: region.name, color, lat, lon, marker });
+    });
+
+    group.addTo(map);
+    regionLayers[region.id] = { group, bounds: L.latLngBounds(latlngs) };
+  });
+
+  map.fitBounds(L.latLngBounds(allBounds), { padding:[24,24] });
+
+  // busca de bairro
+  const searchInput = document.getElementById('searchInput');
+  const searchResults = document.getElementById('searchResults');
+
+  function goToBairro(item){
+    const checkbox = document.querySelector(`.region-row[data-region="${item.regionId}"] input[type=checkbox]`);
+    if (checkbox && !checkbox.checked){ checkbox.checked = true; checkbox.dispatchEvent(new Event('change')); }
+
+    map.flyTo([item.lat, item.lon], Math.max(map.getZoom(), 14), { duration:0.6 });
+
+    const el = item.marker.getElement();
+    const pin = el && el.querySelector('.bairro-pin');
+    if (pin){
+      pin.classList.remove('pin-hit');
+      void pin.offsetWidth; // reinicia a animação se já rodou antes
+      pin.classList.add('pin-hit');
+    }
+
+    searchResults.innerHTML = '';
+    searchInput.value = item.name;
+    searchInput.blur();
+  }
+
+  function renderResults(query){
+    const q = query.trim().toLowerCase();
+    if (!q){ searchResults.innerHTML = ''; return; }
+
+    const matches = searchIndex
+      .filter(item => item.name.toLowerCase().includes(q))
+      .slice(0, 8);
+
+    searchResults.innerHTML = matches.map((item, i) => `
+      <div class="search-result" data-index="${i}">
+        <span class="swatch" style="background:${item.color}"></span>
+        <span class="r-name">${item.name}</span>
+        <span class="r-region">${item.regionName}</span>
+      </div>
+    `).join('');
+
+    [...searchResults.children].forEach((row, i)=>{
+      row.addEventListener('click', ()=> goToBairro(matches[i]));
+    });
+  }
+
+  searchInput.addEventListener('input', ()=> renderResults(searchInput.value));
+  searchInput.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter'){
+      const q = searchInput.value.trim().toLowerCase();
+      const first = searchIndex.find(item => item.name.toLowerCase().includes(q));
+      if (first) goToBairro(first);
+    }
+    if (e.key === 'Escape'){ searchResults.innerHTML=''; searchInput.blur(); }
+  });
+  document.addEventListener('click', (e)=>{
+    if (!e.target.closest('.search')) searchResults.innerHTML = '';
+  });
+
+  // legenda
+  const legend = document.getElementById('legend');
+  REGIONS.forEach(region=>{
+    const count = BAIRROS.filter(b=>b[1]===region.id).length;
+    const chips = BAIRROS.filter(b=>b[1]===region.id).map(b=>`<span class="chip">${b[0]}</span>`).join("");
+    const color = HEX[region.id];
+
+    const row = document.createElement('div');
+    row.className = 'region-row';
+    row.dataset.region = region.id;
+    row.style.setProperty('--dot', color);
+    row.innerHTML = `
+      <div class="row-top">
+        <input type="checkbox" checked>
+        <span class="swatch"></span>
+        <span class="region-name">${region.name}</span>
+        <span class="region-count">${count}</span>
+        <button class="focus-btn" type="button">focar</button>
+      </div>
+      <div class="bairro-chips" hidden>${chips}</div>
+    `;
+
+    const checkbox = row.querySelector('input');
+    const nameEl = row.querySelector('.region-name');
+    const chipsEl = row.querySelector('.bairro-chips');
+    const focusBtn = row.querySelector('.focus-btn');
+
+    checkbox.addEventListener('change', ()=>{
+      const layer = regionLayers[region.id].group;
+      if (checkbox.checked) map.addLayer(layer); else map.removeLayer(layer);
+      row.classList.toggle('dimmed', !checkbox.checked);
+    });
+
+    nameEl.addEventListener('click', ()=>{
+      chipsEl.hidden = !chipsEl.hidden;
+    });
+
+    focusBtn.addEventListener('click', ()=>{
+      map.fitBounds(regionLayers[region.id].bounds, { padding:[40,40] });
+    });
+
+    legend.appendChild(row);
+  });
+</script>
+</body>
+</html>
