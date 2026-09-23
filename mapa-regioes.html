@@ -667,11 +667,10 @@
       <div class="bairro-chips" hidden>${chips}</div>
     `;
 
+    const rowTop = row.querySelector('.row-top');
     const checkbox = row.querySelector('input');
-    const nameEl = row.querySelector('.region-name');
     const chipsEl = row.querySelector('.bairro-chips');
     const focusBtn = row.querySelector('.focus-btn');
-    const chevron = row.querySelector('.region-chevron');
 
     checkbox.addEventListener('click', e => e.stopPropagation());
     checkbox.addEventListener('change', ()=>{
@@ -680,17 +679,14 @@
       row.classList.toggle('dimmed', !checkbox.checked);
     });
 
-    focusBtn.addEventListener('click', e => e.stopPropagation());
+    focusBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      map.fitBounds(regionLayers[region.id].bounds, { padding:[40,40] });
+    });
 
-    function toggleExpanded(){
+    rowTop.addEventListener('click', ()=>{
       const expanded = row.classList.toggle('expanded');
       chipsEl.hidden = !expanded;
-    }
-    nameEl.addEventListener('click', toggleExpanded);
-    chevron.addEventListener('click', toggleExpanded);
-
-    focusBtn.addEventListener('click', ()=>{
-      map.fitBounds(regionLayers[region.id].bounds, { padding:[40,40] });
     });
 
     return row;
