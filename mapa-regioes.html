@@ -145,6 +145,11 @@
   .swatch{ width:10px; height:10px; border-radius:50%; background:var(--dot); flex:0 0 auto; box-shadow:0 0 0 3px color-mix(in srgb, var(--dot) 25%, transparent); }
   .region-name{ font-weight:600; font-size:13.5px; flex:1; }
   .region-count{ font-family:"IBM Plex Mono", monospace; font-size:10.5px; color:var(--ink-muted); }
+  .region-chevron{
+    width:11px; height:11px; flex:0 0 auto; color:var(--ink-muted);
+    transition:transform 150ms ease; transform:rotate(-90deg);
+  }
+  .region-row.expanded .region-chevron{ transform:rotate(0deg); }
   .focus-btn{
     border:1px solid var(--border); background:var(--surface-2); color:var(--ink-2);
     font-size:10.5px; font-family:"IBM Plex Mono", monospace; border-radius:6px;
@@ -654,6 +659,7 @@
         <span class="region-name">${region.name}</span>
         <span class="region-count">${count}</span>
         <button class="focus-btn" type="button">focar</button>
+        ${CHEVRON_ICON.replace('city-chevron','region-chevron')}
       </div>
       <div class="bairro-chips" hidden>${chips}</div>
     `;
@@ -662,16 +668,23 @@
     const nameEl = row.querySelector('.region-name');
     const chipsEl = row.querySelector('.bairro-chips');
     const focusBtn = row.querySelector('.focus-btn');
+    const chevron = row.querySelector('.region-chevron');
 
+    checkbox.addEventListener('click', e => e.stopPropagation());
     checkbox.addEventListener('change', ()=>{
       const layer = regionLayers[region.id].group;
       if (checkbox.checked) map.addLayer(layer); else map.removeLayer(layer);
       row.classList.toggle('dimmed', !checkbox.checked);
     });
 
-    nameEl.addEventListener('click', ()=>{
-      chipsEl.hidden = !chipsEl.hidden;
-    });
+    focusBtn.addEventListener('click', e => e.stopPropagation());
+
+    function toggleExpanded(){
+      const expanded = row.classList.toggle('expanded');
+      chipsEl.hidden = !expanded;
+    }
+    nameEl.addEventListener('click', toggleExpanded);
+    chevron.addEventListener('click', toggleExpanded);
 
     focusBtn.addEventListener('click', ()=>{
       map.fitBounds(regionLayers[region.id].bounds, { padding:[40,40] });
