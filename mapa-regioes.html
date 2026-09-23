@@ -118,6 +118,24 @@
     text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-muted); margin:0 0 10px;
   }
 
+  .city-folder + .city-folder{ margin-top:6px; }
+  .city-header{
+    display:flex; align-items:center; gap:8px; padding:8px;
+    border-radius:10px; cursor:pointer;
+  }
+  .city-header:hover{ background:var(--surface-2); }
+  .city-header input[type=checkbox]{ width:14px; height:14px; flex:0 0 auto; accent-color:var(--ink-2); }
+  .city-icon{ width:15px; height:15px; flex:0 0 auto; color:var(--ink-muted); }
+  .city-name{ font-family:"Archivo", sans-serif; font-weight:700; font-size:13.5px; flex:1; }
+  .city-count{ font-family:"IBM Plex Mono", monospace; font-size:10.5px; color:var(--ink-muted); }
+  .city-chevron{ width:11px; height:11px; flex:0 0 auto; color:var(--ink-muted); transition:transform 150ms ease; }
+  .city-folder.collapsed .city-chevron{ transform:rotate(-90deg); }
+  .city-regions{
+    margin:2px 0 2px 14px; padding-left:10px;
+    border-left:1px solid var(--border);
+  }
+  .city-folder.collapsed .city-regions{ display:none; }
+
   .region-row{ border:0; border-radius:10px; padding:8px; }
   .region-row + .region-row{ margin-top:2px; }
   .region-row:hover{ background:var(--surface-2); }
@@ -220,21 +238,29 @@
 <div class="layout">
   <div id="map"></div>
   <aside class="sidebar">
-    <h2>Regiões</h2>
+    <h2>Cidades &amp; Regiões</h2>
     <div id="legend"></div>
   </aside>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
+  // Cada cidade vira uma pasta na barra lateral; cada região é uma subpasta dentro dela.
+  // Ao importar um KML novo já organizado em pastas (Cidade > Região no Google My Maps),
+  // mapeie o caminho de pastas para cityId/region aqui.
+  const CITIES = [
+    { id:"nf", name:"Nova Friburgo" },
+    { id:"avanca", name:"Área Avança" },
+  ];
+
   const REGIONS = [
-    { id:1, name:"Centro" },
-    { id:2, name:"Conselheiro Paulino" },
-    { id:3, name:"Riograndina / Amparo" },
-    { id:4, name:"Mury / Cascatinha" },
-    { id:5, name:"Campo do Coelho / Conquista" },
-    { id:6, name:"Salinas / Três Picos" },
-    { id:7, name:"Área Avança" },
+    { id:1, name:"Centro", cityId:"nf" },
+    { id:2, name:"Conselheiro Paulino", cityId:"nf" },
+    { id:3, name:"Riograndina / Amparo", cityId:"nf" },
+    { id:4, name:"Mury / Cascatinha", cityId:"nf" },
+    { id:5, name:"Campo do Coelho / Conquista", cityId:"nf" },
+    { id:6, name:"Salinas / Três Picos", cityId:"nf" },
+    { id:7, name:"Área Avança", cityId:"avanca" },
   ];
 
   // [nome, regiaoId, lat, lon] — coordenadas extraídas do KML exportado do Google My Maps
@@ -483,7 +509,8 @@
         )
         .addTo(group);
       allBounds.push([lat, lon]);
-      searchIndex.push({ name, regionId: region.id, regionName: region.name, color, lat, lon, marker });
+      const cityName = CITIES.find(c => c.id === region.cityId)?.name ?? "";
+      searchIndex.push({ name, regionId: region.id, regionName: region.name, cityName, color, lat, lon, marker });
     });
 
     group.addTo(map);
@@ -527,7 +554,7 @@
       <div class="search-result" data-index="${i}">
         <span class="swatch" style="background:${item.color}"></span>
         <span class="r-name">${item.name}</span>
-        <span class="r-region">${item.regionName}</span>
+        <span class="r-region">${item.cityName} › ${item.regionName}</span>
       </div>
     `).join('');
 
@@ -549,9 +576,11 @@
     if (!e.target.closest('.search')) searchResults.innerHTML = '';
   });
 
-  // legenda
-  const legend = document.getElementById('legend');
-  REGIONS.forEach(region=>{
+  // legenda — uma pasta por cidade, com as regiões dela dentro
+  const FOLDER_ICON = `<svg class="city-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a1 1 0 0 1 1-1h4l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"></path></svg>`;
+  const CHEVRON_ICON = `<svg class="city-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>`;
+
+  function buildRegionRow(region){
     const count = BAIRROS.filter(b=>b[1]===region.id).length;
     const chips = BAIRROS.filter(b=>b[1]===region.id).map(b=>`<span class="chip">${b[0]}</span>`).join("");
     const color = HEX[region.id];
@@ -590,7 +619,46 @@
       map.fitBounds(regionLayers[region.id].bounds, { padding:[40,40] });
     });
 
-    legend.appendChild(row);
+    return row;
+  }
+
+  const legend = document.getElementById('legend');
+  CITIES.forEach(city=>{
+    const cityRegions = REGIONS.filter(r => r.cityId === city.id);
+    if (!cityRegions.length) return;
+    const cityCount = BAIRROS.filter(b => cityRegions.some(r => r.id === b[1])).length;
+
+    const folder = document.createElement('div');
+    folder.className = 'city-folder';
+    folder.dataset.city = city.id;
+
+    const header = document.createElement('div');
+    header.className = 'city-header';
+    header.innerHTML = `
+      <input type="checkbox" checked class="city-checkbox">
+      ${FOLDER_ICON}
+      <span class="city-name">${city.name}</span>
+      <span class="city-count">${cityCount}</span>
+      ${CHEVRON_ICON}
+    `;
+    folder.appendChild(header);
+
+    const regionsWrap = document.createElement('div');
+    regionsWrap.className = 'city-regions';
+    cityRegions.forEach(region => regionsWrap.appendChild(buildRegionRow(region)));
+    folder.appendChild(regionsWrap);
+
+    const cityCheckbox = header.querySelector('.city-checkbox');
+    cityCheckbox.addEventListener('click', e => e.stopPropagation());
+    cityCheckbox.addEventListener('change', ()=>{
+      regionsWrap.querySelectorAll('.region-row input[type=checkbox]').forEach(cb=>{
+        if (cb.checked !== cityCheckbox.checked){ cb.checked = cityCheckbox.checked; cb.dispatchEvent(new Event('change')); }
+      });
+    });
+
+    header.addEventListener('click', ()=> folder.classList.toggle('collapsed'));
+
+    legend.appendChild(folder);
   });
 </script>
 </body>
