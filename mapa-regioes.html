@@ -746,7 +746,6 @@
       searchIndex.push({ name, regionId: region.id, regionName: region.name, cityName, color, lat, lon, marker });
     });
 
-    group.addTo(map);
     regionLayers[region.id] = { group, bounds: L.latLngBounds(latlngs) };
   });
 
@@ -819,12 +818,12 @@
     const color = HEX[region.id];
 
     const row = document.createElement('div');
-    row.className = 'region-row';
+    row.className = 'region-row dimmed';
     row.dataset.region = region.id;
     row.style.setProperty('--dot', color);
     row.innerHTML = `
       <div class="row-top">
-        <input type="checkbox" checked>
+        <input type="checkbox">
         <span class="swatch"></span>
         <span class="region-name">${region.name}</span>
         <span class="region-count">${count}</span>
@@ -866,13 +865,13 @@
     const cityCount = BAIRROS.filter(b => cityRegions.some(r => r.id === b[1])).length;
 
     const folder = document.createElement('div');
-    folder.className = 'city-folder';
+    folder.className = 'city-folder collapsed';
     folder.dataset.city = city.id;
 
     const header = document.createElement('div');
     header.className = 'city-header';
     header.innerHTML = `
-      <input type="checkbox" checked class="city-checkbox">
+      <input type="checkbox" class="city-checkbox">
       ${FOLDER_ICON}
       <span class="city-name">${city.name}</span>
       <span class="city-count">${cityCount}</span>
